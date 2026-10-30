@@ -4,8 +4,24 @@ const path = require('node:path');
 const { loadConfig, memoryRootReachable } = require('./config');
 const { parseProjectsIndex, detectProject } = require('./projects');
 const {
-  parseEntries, lastEntries, appendEntry, buildMemoryPayload, dominantLevel, renderStub, sections,
+  parseEntries, lastEntries, appendEntry, buildMemoryPayload, dominantLevel, renderStub, sections, extractEntryTemplate,
 } = require('./memory');
+
+const DEFAULT_TEMPLATE = [
+  '### YYYY-MM-DD — <short title> [<agent: Claude Code | Codex | other>]',
+  '**Project:** <Project folder name>',
+  '**Prompt/Task:** one line on what was asked',
+  '**Changed:** files touched (path:line if relevant)',
+  '**Why:** the reason/context behind the change (business or technical)',
+  '**Status:** done | in progress | blocked — <detail if blocked>',
+  '**Follow-up:** anything the next session should know or pick up (omit if none)',
+].join('\n');
+
+/** The project's own Entry template from its DynamicMemory.md, else the framework default. */
+function entryTemplateFor(project) {
+  const md = project && project.dynamicFile ? readIfExists(project.dynamicFile) : '';
+  return extractEntryTemplate(md) || DEFAULT_TEMPLATE;
+}
 const {
   newState, loadState, saveState, deleteState, updateState, recordChange, unsavedProjects, sweep,
 } = require('./state');
@@ -205,13 +221,18 @@ function stop(input, deps = {}) {
     const extend = state.entryHeading && state.entryHeading[u.folder] ? ' --extend' : '';
     return `node "${CLI_PATH}" append-entry --project ${u.folder} --session ${input.session_id} --file <path to a UTF-8 file holding the entry>${extend}`;
   });
+  const templates = unsaved.map((u) => {
+    const p = projects.find((x) => x.folder === u.folder);
+    return `Entry template for ${u.folder} (use exactly this shape; today's date; agent tag [${TOOL_LABEL[tool] || tool}]; fill every field from what you actually did, one line for the prompt):\n${entryTemplateFor(p)}`;
+  });
   const reason = [
     `You changed files in ${unsaved.map((u) => u.folder).join(', ')} and have not logged the work in the AI Memory Framework.`,
     ...lines.map((l) => `- ${l}`),
     `Session id: ${input.session_id}`,
-    `Append one entry to each project's DynamicMemory.md now, following that file's own Entry template (${cmd(tool, 'save')} explains the format). Write the entry to a temp file named aimemory-entry.md as UTF-8, then run:`,
+    ...templates,
+    `Write the entry to a temp file named aimemory-entry.md as UTF-8 (${cmd(tool, 'save')} has the full procedure), then run:`,
     ...commands.map((c) => `  ${c}`),
-    'Then stop.',
+    'Then stop. Do not edit DynamicMemory.md by hand; the command appends it for you.',
   ].join('\n');
   logInfo(`Stop blocked session ${input.session_id} (${tool}) for ${unsaved.map((u) => u.folder).join(',')}`);
   return { decision: 'block', reason };

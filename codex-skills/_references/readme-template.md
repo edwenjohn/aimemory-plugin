@@ -47,15 +47,15 @@ Add this to each project's `AGENTS.md` (substitute the project's own folder name
 ```md
 This project uses a cross-model AI memory framework:
 
-- `F:\AI Memory Framework\Projects.md` - index of all tracked projects.
-- `F:\AI Memory Framework\<ProjectName>\Memory.md` - stable architecture and conventions.
-- `F:\AI Memory Framework\<ProjectName>\DynamicMemory.md` - recent task/change log.
+- `<MEMORY_ROOT>\Projects.md` - index of all tracked projects.
+- `<MEMORY_ROOT>\<ProjectName>\Memory.md` - stable architecture and conventions.
+- `<MEMORY_ROOT>\<ProjectName>\DynamicMemory.md` - recent task/change log.
 
 At session start, read `Memory.md` once and the last 5-10 entries of `DynamicMemory.md`.
 After meaningful work, append a short factual entry to `DynamicMemory.md`.
 If `Memory.md` is stale, correct it in place.
 ```
 
-Every project gets its own folder, e.g. `F:\AI Memory Framework\ProjectName\Memory.md` + `DynamicMemory.md`. Avoid mixing unrelated project histories in one `DynamicMemory.md`. Register every new project as a row in `Projects.md`.
+Every project gets its own folder, e.g. `<MEMORY_ROOT>\ProjectName\Memory.md` + `DynamicMemory.md`. Avoid mixing unrelated project histories in one `DynamicMemory.md`. Register every new project as a row in `Projects.md`.
 
 When a task touches more than one project, record the work in each affected project's own `DynamicMemory.md`, and include the project name in each entry.

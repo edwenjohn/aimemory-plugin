@@ -333,3 +333,13 @@ test('the temp entry file a save writes is never recorded as a change (review: s
   const st = loadState('tmp-1');
   assert.deepEqual(st.changes, {});
 });
+
+test('stop block reason quotes the project\'s own Entry template so the agent cannot miss the format (live smoke finding)', () => {
+  stateWithChange('tpl-1');
+  const r = run('hook-stop', stopInput('claude', repoDir, 'tpl-1'), ['--tool', 'claude']).json;
+  assert.equal(r.decision, 'block');
+  assert.match(r.reason, /Entry template for SummitPharma-Child-Theme/);
+  assert.match(r.reason, /### YYYY-MM-DD — <short title> \[<agent: Claude Code \| Codex \| other>\]/);
+  assert.match(r.reason, /\*\*Follow-up:\*\*/);
+  assert.match(r.reason, /\[Claude Code\]/);
+});

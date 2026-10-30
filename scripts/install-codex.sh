@@ -50,8 +50,8 @@ cat <<'EOF'
 Next steps in Codex:
   1. Restart Codex (CLI, desktop app or IDE extension).
   2. Open the plugin browser, find "AI Memory" (aimemory) and enable it.
-  3. Run its setup (the onboarding skill) and give it your memory folder, e.g. F:\AI Memory Framework.
-     Or in any session: $aimemory-path F:\AI Memory Framework
+  3. Run its setup (the onboarding skill) and give it your memory folder (the one holding Projects.md).
+     Or in any session: $aimemory-path <path to your memory folder>
   4. Run /hooks and trust the aimemory hooks; they are skipped until you do.
   5. Check with $aimemory-status.
 EOF

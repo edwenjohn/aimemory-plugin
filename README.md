@@ -23,8 +23,10 @@ claude plugin install aimemory@aimemory
 (From a local clone instead: `claude plugin marketplace add C:\path\to\aimemory-plugin`.) Start a new session anywhere; the plugin will say no memory path is set. Then:
 
 ```
-/aimemory:path F:\AI Memory Framework
+/aimemory:path <path to your memory folder>
 ```
+
+For example `/aimemory:path D:\AI-Memory`. The folder is the one that holds `Projects.md`; every machine has its own location.
 
 ### Codex (CLI, desktop app, IDE extension)
 
@@ -36,7 +38,7 @@ bash scripts/install-codex.sh                                          # macOS /
 The script copies the plugin to `~/.agents/plugins/aimemory` and adds it to your personal marketplace `~/.agents/plugins/marketplace.json` with the documented `./aimemory` relative path. Then, in Codex:
 
 1. Restart Codex, open the plugin browser, enable **AI Memory**.
-2. Run its setup (the onboarding skill is the path skill) and give it the memory folder, or type `$aimemory-path F:\AI Memory Framework` in any session.
+2. Run its setup (the onboarding skill is the path skill) and give it the memory folder, or type `$aimemory-path <path to your memory folder>` in any session.
 3. Run `/hooks` and trust the aimemory hooks. Codex skips plugin hooks until you do.
 
 The path is stored once in `~/.aimemory/config.json` and shared by both tools.
@@ -123,6 +125,6 @@ Design: `docs/superpowers/specs/2026-10-30-aimemory-plugin-design.md` and the ma
 - Known quirk: one `claude -p` run left its session state file behind (SessionEnd did not fire on that run). Harmless; state files are swept after 7 days.
 - SessionEnd budget: Claude Code gives SessionEnd hooks about 1.5 s regardless of the hook's own `timeout` (raise with `CLAUDE_CODE_SESSIONEND_HOOKS_TIMEOUT_MS`); Codex caps it at 3 s. The stub write is a single append, well inside both.
 
-**Codex: installed, not yet verified in a session.** `scripts/install-codex.ps1` copied the plugin to `~/.agents/plugins/aimemory` and wrote the marketplace entry with the `./aimemory` relative path. This machine has the Codex desktop app but no `codex` CLI on PATH, so the remaining steps are manual: enable **AI Memory** in the plugin browser, run setup (or `$aimemory-path F:\AI Memory Framework`), trust the hooks via `/hooks`, then check `$aimemory-status`. Things to confirm there and record here: that the plugin appears at all (if not, try an absolute `source.path`), that Codex honours the compat manifest's `skills: ./codex-skills/` path (fallback in the design doc §5), that `${PLUGIN_ROOT}` is substituted in hook commands on Windows (else add `commandWindows` forms), and whether the desktop app runs SessionStart hooks.
+**Codex: installed, not yet verified in a session.** `scripts/install-codex.ps1` copied the plugin to `~/.agents/plugins/aimemory` and wrote the marketplace entry with the `./aimemory` relative path. This machine has the Codex desktop app but no `codex` CLI on PATH, so the remaining steps are manual: enable **AI Memory** in the plugin browser, run setup (or `$aimemory-path <path to your memory folder>`), trust the hooks via `/hooks`, then check `$aimemory-status`. Things to confirm there and record here: that the plugin appears at all (if not, try an absolute `source.path`), that Codex honours the compat manifest's `skills: ./codex-skills/` path (fallback in the design doc §5), that `${PLUGIN_ROOT}` is substituted in hook commands on Windows (else add `commandWindows` forms), and whether the desktop app runs SessionStart hooks.
 
-**Projects with their own AGENTS.md.** Existing per-project instruction files that hardcode `F:\AI Memory Framework\…` keep working and the agent will follow them; they simply agree with the plugin. If the memory store ever moves, update those files as well as `/aimemory:path`.
+**Projects with their own AGENTS.md.** Existing per-project instruction files that hardcode the memory folder path keep working and the agent will follow them; they simply agree with the plugin. If the memory store ever moves, update those files as well as `/aimemory:path`.

@@ -300,3 +300,21 @@ test('append-entry decodes a UTF-16 BOM file and refuses mojibake (review I1)', 
   assert.equal(b.appended, undefined);
   fs.writeFileSync(dyn, original);
 });
+
+test('--init-root writes the user\'s real root into the starter README instead of a placeholder (user feedback: paths differ per machine)', () => {
+  const empty = fs.mkdtempSync(path.join(home, 'empty-root2-'));
+  run(['config', 'set', 'memoryRoot', empty, '--init-root']);
+  const readme = fs.readFileSync(path.join(empty, 'README.md'), 'utf8');
+  assert.ok(!readme.includes('<MEMORY_ROOT>'), 'placeholder must be substituted');
+  assert.ok(!readme.includes('F:\\AI Memory Framework'), 'no author-specific path');
+  assert.ok(readme.includes(empty + '\\Projects.md'), 'the real root appears in the starter README');
+});
+
+test('no shipped file hardcodes the author\'s machine paths (user feedback)', () => {
+  const files = ['README.md', 'scripts/install-codex.ps1', 'scripts/install-codex.sh', 'skills/path/SKILL.md', 'skills/_references/readme-template.md'];
+  for (const f of files) {
+    const text = fs.readFileSync(path.join(REPO, f), 'utf8');
+    assert.ok(!/F:\\AI Memory Framework/.test(text), f + ' still names the author\'s memory folder');
+    assert.ok(!/Users[\\/]AU\b/.test(text), f + ' names the author\'s home folder');
+  }
+});

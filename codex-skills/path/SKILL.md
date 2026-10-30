@@ -17,7 +17,7 @@ node "${PLUGIN_ROOT}/scripts/aimemory.js" config get
 
 ## Set the path
 
-1. If the user did not give a folder, ask for it. Suggest an existing folder named "AI Memory Framework" if you can see one (drive roots, Documents), for example `F:\AI Memory Framework`.
+1. If the user did not give a folder, ask for it. Suggest an existing folder named "AI Memory Framework" if you can see one (drive roots, Documents), for example `D:\AI-Memory`. Never assume a drive letter; every machine differs.
 
 2. Set it:
 

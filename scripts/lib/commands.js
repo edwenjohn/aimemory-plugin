@@ -55,8 +55,8 @@ function cmdConfig(args, flags) {
       if (flags['init-root']) {
         const idx = path.join(root, 'Projects.md');
         const readme = path.join(root, 'README.md');
-        if (!fs.existsSync(idx)) fs.writeFileSync(idx, readRef('projects-template.md'), 'utf8');
-        if (!fs.existsSync(readme)) fs.writeFileSync(readme, readRef('readme-template.md'), 'utf8');
+        if (!fs.existsSync(idx)) fs.writeFileSync(idx, readRef('projects-template.md').replace(/<MEMORY_ROOT>/g, root), 'utf8');
+        if (!fs.existsSync(readme)) fs.writeFileSync(readme, readRef('readme-template.md').replace(/<MEMORY_ROOT>/g, root), 'utf8');
       }
       const cfg = saveConfig({ memoryRoot: root });
       return { ...cfg, ...rootInfo(root) };
