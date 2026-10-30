@@ -1,0 +1,14 @@
+{
+  "name": "aimemory-plugin",
+  "version": "0.1.0",
+  "description": "AI Memory Framework plugin for Claude Code and Codex: auto-pull project memory at session start, enforce logging of changed work, and expose pull/save/update/path/init/list/search/pause/status skills.",
+  "private": true,
+  "type": "commonjs",
+  "license": "MIT",
+  "author": { "name": "Aaron" },
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "test": "node --test tests/",
+    "build": "node scripts/build-codex-skills.js"
+  }
+}
