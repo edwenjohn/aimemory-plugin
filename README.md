@@ -115,4 +115,13 @@ Design: `docs/superpowers/specs/2026-10-30-aimemory-plugin-design.md` and the ma
 
 ## Verified on
 
-<!-- filled in by the smoke test -->
+**Claude Code 2.1.220 (CLI), Windows 11, Node 22.18, 2026-10-30.** Installed from the local marketplace, path set, then two headless `claude -p` runs in the SummitPharma child theme folder:
+
+- SessionStart injected the project's memory: the agent named "SummitPharma Child Theme" and the newest DynamicMemory.md entry without using tools.
+- Writing a scratch file then stopping: the Stop hook blocked once (`hooks.log`: "Stop blocked session … for SummitPharma-Child-Theme"), the agent appended an entry following the file's own h3 Entry template, then stopped.
+- SessionEnd wrote an `[auto-stub]` when the session's save went to a different root than the configured one (test artifact: the project's own AGENTS.md hardcodes `F:\AI Memory Framework`, which is where it saved; in normal use the configured root and AGENTS.md agree).
+- Known quirk: one `claude -p` run left its session state file behind (SessionEnd did not fire on that run). Harmless; state files are swept after 7 days.
+
+**Codex: installed, not yet verified in a session.** `scripts/install-codex.ps1` copied the plugin to `~/.codex/plugins/aimemory` and wrote the marketplace entry. This machine has the Codex desktop app but no `codex` CLI on PATH, so the remaining steps are manual: enable **AI Memory** in the plugin browser, run setup (or `$aimemory-path F:\AI Memory Framework`), trust the hooks via `/hooks`, then check `$aimemory-status`. Two things to confirm there and record here: that Codex honours the compat manifest's `skills: ./codex-skills/` path (if not, see the fallback in the design doc §5), and whether the desktop app runs SessionStart hooks.
+
+**Projects with their own AGENTS.md.** Existing per-project instruction files that hardcode `F:\AI Memory Framework\…` keep working and the agent will follow them; they simply agree with the plugin. If the memory store ever moves, update those files as well as `/aimemory:path`.
