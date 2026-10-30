@@ -1,0 +1,16 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "aimemory",
+  "description": "AI Memory Framework plugin: shared project memory for Claude Code and Codex",
+  "owner": { "name": "Aaron" },
+  "plugins": [
+    {
+      "name": "aimemory",
+      "description": "Auto-pull project memory at session start, enforce logging of changed work, and expose pull/save/update/path/init/list/search/pause/status skills.",
+      "version": "0.1.0",
+      "author": { "name": "Aaron" },
+      "source": "./",
+      "category": "productivity"
+    }
+  ]
+}

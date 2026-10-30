@@ -1,0 +1,10 @@
+{
+  "name": "aimemory",
+  "displayName": "AI Memory",
+  "version": "0.1.0",
+  "description": "AI Memory Framework for Claude Code: loads a project's Memory.md and recent DynamicMemory.md entries at session start, blocks finishing a turn with unlogged file changes until the work is logged, and adds pull/save/update/path/init/list/search/pause/status skills.",
+  "author": { "name": "Aaron" },
+  "license": "MIT",
+  "keywords": ["memory", "context", "handoff", "codex", "cross-model"],
+  "hooks": "./hooks/claude.json"
+}

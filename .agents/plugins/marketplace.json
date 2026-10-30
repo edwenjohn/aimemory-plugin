@@ -1,0 +1,11 @@
+{
+  "name": "aimemory-local",
+  "plugins": [
+    {
+      "name": "aimemory",
+      "source": { "source": "local", "path": "./" },
+      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "category": "Productivity"
+    }
+  ]
+}

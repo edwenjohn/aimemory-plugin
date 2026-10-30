@@ -1,0 +1,20 @@
+{
+  "name": "aimemory",
+  "version": "0.1.0",
+  "description": "AI Memory Framework for Codex: loads a project's Memory.md and recent DynamicMemory.md entries at session start, blocks finishing a turn with unlogged file changes until the work is logged, and adds aimemory-pull/save/update/path/init/list/search/pause/status skills.",
+  "skills": "./codex-skills/",
+  "hooks": "./hooks/codex.json",
+  "onboardingSkill": "./codex-skills/path/SKILL.md",
+  "interface": {
+    "displayName": "AI Memory",
+    "shortDescription": "Shared project memory for Claude Code and Codex",
+    "longDescription": "Keeps a plain-Markdown memory store (Projects.md, per-project Memory.md and DynamicMemory.md) that any coding agent can read and append to. At session start the plugin detects the project from the working folder and injects its memory; when a turn changed project files, the Stop hook requires a log entry before the agent can finish. Skills: $aimemory-pull, $aimemory-save, $aimemory-update, $aimemory-path, $aimemory-init, $aimemory-list, $aimemory-search, $aimemory-pause, $aimemory-status.",
+    "developerName": "Aaron",
+    "category": "Productivity",
+    "capabilities": ["Read", "Write"],
+    "defaultPrompt": [
+      "Use $aimemory-pull to load this project's memory.",
+      "Use $aimemory-save to log the work we just did."
+    ]
+  }
+}

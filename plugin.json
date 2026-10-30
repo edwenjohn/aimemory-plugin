@@ -1,0 +1,6 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "aimemory",
+  "version": "0.1.0",
+  "description": "AI Memory Framework: shared, file-based project memory for coding agents. Loads Memory.md and recent DynamicMemory.md entries at session start, requires changed work to be logged before a turn ends, and provides pull/save/update/path/init/list/search/pause/status skills."
+}
