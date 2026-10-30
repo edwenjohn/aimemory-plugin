@@ -1,0 +1,120 @@
+# Dynamic Memory Log — SummitAutomation (Summit Reports)
+
+> **Purpose:** Running, chronological log of prompts/tasks/changes across ALL AI tools (Claude Code, Codex CLI, etc.) and sessions. Pairs with `Memory.md` (static architecture reference — read that first). This file is the "what's been happening lately" layer.
+>
+> **Repo:** `C:\Users\AU\Documents\SummitAutomation` (git; working branch `feature/medirecords-patients`, `main` at 2026-09-15)
+
+---
+
+## How to use this file (read before editing)
+
+**Every AI agent working on this project must:**
+
+1. **On session start:** read the last 5–10 entries below (most recent are at the bottom) to know what's currently in flight, what was just changed, and any open follow-ups.
+2. **After finishing a task, feature, or bugfix** (batch a coherent unit of work into one entry, not every tiny tool call): append a new entry using the template below.
+3. **Keep entries short and factual.** Include file paths so the next session can jump straight there.
+4. **Don't rewrite history** — only append. Correct mistakes with a new follow-up entry, not by editing old ones.
+5. **This project has siblings** (`SummitPharma-Child-Theme`, `SummitPharma-AusPost` — same business, different codebases). If a task touches more than one, log it in each project's `DynamicMemory.md`; don't merge them.
+6. **Measured numbers belong here with their date and window.** This project's whole job is reporting, so a figure quoted without its window is worse than no figure.
+
+### Entry template
+
+```
+### YYYY-MM-DD — <short title> [<agent: Claude Code | Codex | other>]
+**Project:** SummitAutomation
+**Prompt/Task:** one line on what was asked
+**Changed:** files touched (path:line if relevant)
+**Why:** the reason/context behind the change (business or technical)
+**Status:** done | in progress | blocked — <detail if blocked>
+**Follow-up:** anything the next session should know or pick up (omit if none)
+```
+
+---
+
+## Log
+
+> **Note on this log's start date.** The `F:` drive was formatted on/around 2026-10-02 and the framework folder was lost. A 2026-07-30 copy of the framework was recovered from `C:\Users\AU\Documents\AI Memory Framework` and restored, but it **predates this project**, so SummitAutomation had no files in it. `Memory.md` and this log were rebuilt on 2026-10-02 from the live repo plus the sessions in flight at the time. **Entries before 2026-10-02 are not recoverable** — the repo's own git history (`git log`) and `docs/superpowers/specs|plans/` are the surviving record of that period, and §§6–8 of `Memory.md` carry the conclusions that mattered.
+
+### 2026-10-02 — Framework rebuilt on F: after the drive was formatted [Claude Code]
+**Project:** SummitAutomation
+**Prompt/Task:** The owner formatted `F:`, could not find his backup, and asked for the AI Memory Framework to be recreated there.
+**Changed:** Restored `F:\AI Memory Framework\` (README.md, Projects.md, `Kush-Shop-Child/`, `Namba-AI-Framework/`, `SummitPharma-AusPost/`, `SummitPharma-Child-Theme/`, `.claude/`) from the 2026-07-30 copy at `C:\Users\AU\Documents\AI Memory Framework`. Created `SummitAutomation\Memory.md` (new, written from a verified read of the repo) and this file. Added a SummitAutomation row plus a restore note to `Projects.md`. No repo source files changed.
+**Why:** `AGENTS.md` in the repo points every agent at `F:\AI Memory Framework\...`; with the drive wiped, each session was starting blind. A drive-wide search of `C:`, `D:`, `E:` found only the July copy — no archive, no fresher snapshot.
+**Status:** done
+**Follow-up:** The four older projects are restored at their **2026-07-30 state**; any August/September updates to them are lost and their own logs should say so when next touched. Consider keeping the framework in a git repo or a synced folder instead of a single removable drive — a second format loses it again. The copy at `C:\Users\AU\Documents\AI Memory Framework` was left in place as-is.
+
+### 2026-10-02 — Corrected the channel comparison: the till export is Caloundra register only [Claude Code]
+**Project:** SummitAutomation
+**Prompt/Task:** The owner challenged the claim that counter takings fell "because online ordering took over", pointing out that every online order is dispensed at the pharmacy and recorded in ZDispense/ZOffice — and then that the imported Z Office data is **Caloundra only**, which made the comparison lopsided.
+**Changed:** No code. Findings recorded in `Memory.md` §7 and §8 (and in the local Claude memory file `zoffice-till-source-scope.md`).
+**Why:** Both of the owner's objections were correct and two of my stated claims were not. Evidence gathered against production: every `payments` value in `till_sale` for 2026 is a register tender (EFTPOS 14,868 / CASH 2,988 / card combinations) with **zero** web-gateway rows, versus WooCommerce's Merchant Warrior / PayWay / Pay In Store — so the cleaned folder is a **Z Register point-of-sale export**, and posted web orders are structurally absent from it rather than missing from Z Office. Re-ran the channel trend with **Caloundra on both sides** (2026 website $6.03M, not the $6.73M both-sites figure).
+**Status:** done
+**Follow-up:** Two claims retracted and not to be reused: "online ordering took over" (an inference, not a finding) and the "98% → 38%" register-share figure (it came from `cld_scripts_rows.csv`, since deleted). **Measured double-count to subtract before combining sources:** 1 Jan – 19 Sep 2026, Caloundra, 7,664 web orders paid in store, 80.3% matching a same-day till receipt for the identical total against a 16.4% coincidence floor (online-paid control) — roughly 4,900–6,100 orders, ~$0.8–1.0M of the till's $2.18M. Still outstanding from the analyst / Z Software: a cleaned **Brisbane** till export, a corrected **July 2026** workbook (95 rows short), and whether Z Office can export a **web order reference** (that would replace the amount-matching above with an exact join).
+
+### 2026-10-02 — Z Office bulk load and the disk-IO work, as left [Claude Code]
+**Project:** SummitAutomation
+**Prompt/Task:** Build Manual Import, fix a Supabase "about to deplete its Disk IO Budget" warning without losing functionality, drop the analyst CSV data, then load all 16 cleaned workbooks (2021–2026).
+**Changed:** `apps/api/src/imports/*`, `apps/api/src/reports/catalogue/{dispense-scripts,till-sales,org}.ts`, `apps/api/src/cli/{import-zoffice,prune-order-payloads,backfill-shop-location}.ts`, `apps/web/src/pages/settings-import.tsx`, migrations `0012`–`0016`, specs/plans `docs/superpowers/specs|plans/2026-10-01-manual-import*`, `…2026-10-02-disk-io*`.
+**Why:** `dispense_script.raw` was 681 B/row and **inline** (under the ~2 KB TOAST threshold), so every sequential scan read it; and `localDate(dispensed_at)` made the plain index unusable. Fixed by storing `raw` only for rows with a parse problem plus expression indexes matching the catalogue SQL character-for-character. Verified on production with `EXPLAIN`: `Index Scan using dispense_script_organisation_id_location_local_date_idx` with the timezone expression as `Index Cond`.
+**Status:** done — database ~710 MB (was 723 MB, peaked 784 MB). `till_sale` 143,717 rows; `dispense_script` truncated to 0 on the owner's instruction.
+**Follow-up:** `prune-order-payloads` is **built but never run** — it needs `--keep-days` (no default, because the default would be someone's data policy) and `--accept-location-loss`; the 270 MB `order_payload` table is waiting on the owner naming a retention window. `backfill-shop-location` wants a `--recompute` flag (rule 4 is first-pass-only now that a stored value outranks it). One leftover `FAILED` `manual_import` row from an abandoned 2023 workbook run could be removed.
+
+### 2026-10-07 — Cleaned the Brisbane Z Office export [Claude Code]
+**Project:** SummitAutomation
+**Prompt/Task:** The owner asked for the Brisbane Z Office data in `…\ZOffice Sales Reports - Cleaned\All time BNE` to be cleaned the way the Caloundra set was.
+**Changed:** Created `C:\Users\AU\Downloads\ZOffice Sales Reports - Cleaned\All time BNE\BNE All Time - cleaned.xlsx` (10,396 rows, 8,160 receipts, $1,331,316.53, 18 Mar 2025 → 7 Oct 2026). No repo source files changed; `Memory.md` §7 gained a new §7.1 with the column map and the traps. Analysis ran in the session scratchpad and the temporary `.xlsx` conversions of the patient data were deleted afterwards.
+**Why:** The two delivered files were raw legacy `.xls`, not the cleaned 26-column shape: the 26 columns sit at merged positions with blank columns between them (`Payments` at `AI`, `Sell Price` at `AM`), the 65,536-row BIFF limit spilled the data across three sheets with the header on the first only, and each file ends with 8 rows of report furniture. Also `BNE Sales 2025.xls` is actually the all-time export and `BNE Sales 2026.xls` a subset of it (6,425 of 6,427 lines shared), so they had to be merged and de-duplicated rather than loaded as two years.
+**Status:** done, and **loaded the same day** on the owner's go-ahead: 10,396 rows created, 0 problems, 23 s, `VACUUM (ANALYZE)` after. `till_sale` now holds both sites (154,113 rows); Caloundra was untouched, no `(receipt_no, line_key)` pair duplicates, no row carries `raw`. Database 714 → 721 MB.
+**Follow-up:** **Correction made the same day:** an earlier version of this entry and of `Memory.md` §7.1 said the raw header labels only 13 of its 26 columns. That was wrong — it labels all 26; the probe that produced the claim printed only the first 30 spreadsheet columns. The column mapping itself was right, and the cleaned file is unaffected. **Known source defect:** each raw export falls short of its *own* grand-total row (all-time by 4 qty / $416.50, the 2026 file by 2 qty / $299.00) because a record straddling a sheet boundary is lost; merging recovered one, leaving the cleaned file **$319.00 (0.024%) short**. Ask the analyst / Z Software to re-export as `.xlsx` or CSV, which has no row limit and would recover it — the same conversation as the outstanding corrected July 2026 Caloundra workbook and the web-order-reference request. Note Brisbane's register starts 18 Mar 2025 and this export runs to 7 Oct 2026 while Caloundra stops 19 Sep 2026, so combined counter figures need a common window.
+
+### 2026-10-12 — Sales source: one report over both sources [Claude Code]
+**Project:** SummitAutomation
+**Prompt/Task:** The owner wanted a "Sales Source" option on sales/orders reports and quick reports — Online store vs ZOffice — so one report could serve both instead of being built twice. Mid-task he added that sales also need a script / OTC category, and asked whether Z Office can tell them apart on its own or whether it needs the product records.
+**Changed:** Spec `docs/superpowers/specs/2026-10-12-sales-source-design.md` (commits e6f2602, 3fa5e93). Implementation 11b1e13: new `apps/api/src/reports/catalogue/sales.ts`, `packages/shared/src/sales-source.ts`, migration `0017_store_counter_sales`, plus the `source` kind through `reports.ts` / `params.ts` / `grouping.ts` / `validate.ts` / `param-inputs.tsx` / `questions-panel.tsx`. Tests: `test/reports/sales.test.ts` (11), a Sales case in `catalogue.test.ts`, an `EXPLAIN` case in `indexes.test.ts`, a web control case. Also ee86167, the separate ZOffice-sales rename that had been sitting uncommitted.
+**Why:** A parameter cannot swap a report's base table without invalidating every column on it, so the choice had to be a filter over a union rather than a dataset swap. `DatasetDef.from` is interpolated raw with `{a}` substitution, so the union needed no planner change.
+**Status:** done — typecheck, lint and all three builds green by exit code after the last commit; suites 713 API / 364 web / 124 shared. **Migration 0017 is NOT deployed to the live database**, so the dataset currently appears in the builder but would fail on the missing column.
+**Follow-up:** Deploy 0017 (one boolean on a 2-row table, a partial unique index, and one `UPDATE` flagging Shop SummitPharma) before anyone uses the Sales dataset. **Measured facts worth keeping:** 8,547 of 120,342 receipts (7.1%, $2,468,722) mix script and non-script lines, which is why script/OTC are two money columns rather than a category; non-script is only 1.4% of counter revenue; 0 receipts have lines disagreeing on timestamp, which is what lets `sold_at` be a GROUP BY key and keeps date filters on an index. **Out of scope and awaiting the owner's ruling:** classifying *online* orders as script or OTC — `product.categories` is unnormalised (`Medical Cannabis`, `Non-Prescription Product`, `OTC`, `MC`, `FLOWERS`/`Flowers` …) and 79 of 363 products have no category at all, so which names mean prescription is his call, not an implementer's guess.
+**Note:** the owner's API (`node dist\main.js`) held the Prisma query engine DLL and blocked `prisma generate`; it was stopped, the client regenerated, and the API restarted on the new build (health 200, db ok, worker ok).
+
+### 2026-10-12 — Script/OTC is curated per product, because item_type is a transaction type [Claude Code]
+**Project:** SummitAutomation
+**Prompt/Task:** The owner rejected classifying script vs OTC from Z Office's `item_type` ("i think it is not reliable") and asked to key it off the product instead, set manually, plugging in products that have no category.
+**Changed:** Spec revision fa1b507; implementation 3c8ac70 — migration `0018_counter_product`, `CounterProduct` model, `counter-products.{service,controller}.ts`, `settings-product-types.tsx` plus its tab and route, the `sales` dataset's three category columns, and tests (8 API, 6 web, plus reworked `sales.test.ts`).
+**Why:** He was right, and the measurement is the useful part. `item_type` is the till's *transaction* type: **72 stock names appear under more than one of them across 114,724 lines and $18,522,865** — 73% of counter revenue — and classifying by it overstates OTC by ~9%. But his preferred route could not resolve either: **6 of 449 till stock names match a `product.name`** ($359 of $25.47M), so there is nothing to inherit from the product record and mapping all 449 would be ~800 decisions whose errors move revenue silently. So the judgement is stored against the till's own name, listed by revenue because the top 10 names are 66.1% of the counter and the top 100 are 95.1%, with 189 names worth under $1,000 each.
+**Status:** done and **deployed**. Typecheck, lint and all three builds green by exit code after the last commit; 722 API / 370 web / 124 shared. Migrations 0017 and 0018 applied to the live database 12 Oct 2026 against `aws-0-ap-southeast-2.pooler.supabase.com`, then verified on production: `Shop SummitPharma` is the single store flagged `owns_counter_sales`; flagging a second is rejected by the partial unique index (tried, rolled back, still exactly one); `counter_product` exists with its CHECK and unique index and 0 rows; and the dataset's own SQL runs — September 2026 returned Online 4,326 sales / $845,030 and ZOffice 1,734 receipts / $249,438, with ZOffice attributed to Shop SummitPharma and Online split Summit 4,205 / Green Clinic 121.
+**Follow-up:** Nothing is classified yet, so the counter's entire $249,438 for September reports as **Unclassified** — the correct answer rather than a fault. The owner classifies from Settings → Product types; the top ~50 names reach 88% of revenue and the top 100 reach 95%. **A mistake worth remembering:** `apps/web/src/app.tsx` is lower-case, so `git add apps/web/src/App.tsx` silently stages nothing on this case-insensitive filesystem — the first commit had the new Settings tab without its route and every gate still passed, because nothing tests routing. Check `git show --stat` names the files you meant.
+
+### 2026-10-12 — Bulk classification on Settings → Product types [Claude Code]
+**Project:** SummitAutomation
+**Prompt/Task:** "we should have the check box and action like set to script/otc dropdown then update button. this we can save time updating."
+**Changed:** Commit 8bd0e28 — `PUT /api/counter-products/bulk` with `setMany` in `counter-products.service.ts`, checkboxes / select-all / an action bar in `settings-product-types.tsx`, and tests (6 API, 6 web).
+**Why:** Looping the existing single-name endpoint would be one round trip per product, and Supabase is in Sydney at ~0.5 s each — about a minute for 100 products, and the per-row pattern `AGENTS.md` forbids. So the bulk call is **one statement**: `INSERT … SELECT FROM unnest(…) ON CONFLICT` for script/otc, one `DELETE … = ANY(…)` to clear. A test spies the statement count, so a refactor to a loop fails rather than just getting slow. Names are de-duplicated first because `ON CONFLICT DO UPDATE` refuses to touch a row twice in one statement.
+**Status:** done. Typecheck, lint and all three builds green by exit code after the commit; 728 API / 376 web / 124 shared. API restarted on the new build (health 200).
+**Follow-up:** Two operator protections worth preserving if this screen is reworked: select-all takes only the rows **currently shown** (so the search and filter are respected, not all 449), and a name that leaves the filter is dropped from the selection, so Update cannot change products no longer on screen. Bulk-clearing confirms first because it deletes judgements; setting Script or OTC does not, because it only overwrites.
+
+### 2026-10-12 — All 449 counter products classified by the owner [Claude Code]
+**Project:** SummitAutomation
+**Prompt/Task:** The owner classified every counter product on Settings → Product types, then asked earlier why `BLANK DD`, `BLANK NHS`, `BLANK NON-NHS` and `jack` appeared as products.
+**Changed:** No code. `counter_product` now holds **449 rows — 326 script, 123 otc**, 100% of counter revenue covered. Counter split: **Script $25,036,376 / OTC $437,069 / Unclassified $9,322** (the 179 lines with no stock name, which is the designed behaviour).
+**Why those odd names exist:** `BLANK DD` / `BLANK NHS` / `BLANK NON-NHS` / `BLANK REPAT` / `BLANK S3R` are Z Office **placeholder stock codes** used when the real item is not in the stock file — UK-derived naming, DD = Dangerous Drug. Most of their lines have `item_description` identical to the stock name, but a minority carry a real item and a script number (`Compounded THC 20:CBD1 In 100Ml MCT Oil 1 (RX 16769)`). `jack` is a junk stock entry: 70 lines, all Caloundra, all with an RX, 17 Aug – 5 Nov 2024, every description `Ice Cream Cake 19% [10G] Flower 19% THC 10G`.
+**Status:** done.
+**Follow-up / open question for the owner:** he marked all the BLANK codes and `jack` as **otc**, so **28.2% of the OTC figure ($123,157 of $437,069) sits on lines that name a prescription** — $100,278 of it on those placeholder codes (`BLANK DD` $62,807, `BLANK NON-NHS` $19,209, `jack` $10,735, `BLANK NHS` $7,527). The rest is vaporisers and pods dispensed against scripts (~$14k), which is a legitimate device-vs-medicine call. The reverse direction is clean: only 3 script-marked names never name a prescription, $248 in total. **Flagged to him and awaiting his decision** — flipping those four to script, or to unclassified, is a one-click bulk action. Also worth asking the dispensers to stop using BLANK codes where a real stock item exists, and Z Software to retire `jack`.
+
+### 2026-10-12 — Product type question, and Green Clinic is a separate NZ business [Claude Code]
+**Project:** SummitAutomation
+**Prompt/Task:** The owner wanted OTC/Script usable in the report builder and as a quick-report question beside Sales source, and described a dependent cascade: Source → Store → Caloundra/Brisbane.
+**Changed:** Commit fa45225 — `packages/shared/src/product-type.ts`, a `product_type` param kind through `reports.ts` / `params.ts` / `param-inputs.tsx` / `questions-panel.tsx`, `productTypeField` in `org.ts`, the field on `till_sales` (LEFT JOIN `counter_product`), `ORG_CURRENCY` filter on the `sales` online half, and tests (6 new API, 1 shared block, 1 web, 1 sales case).
+**Why:** **Green Clinic turned out to be a separate New Zealand business trading in NZD** — the owner said so when asked about its location labels. The catalogue has a single `ORG_CURRENCY = 'AUD'`, so an unfiltered Sales total was adding NZD to AUD and calling it AUD (NZ$115,741 over 695 orders; small but wrong in kind). He chose to keep Green Clinic out of Summit's reports, so the online half now filters `o.currency = ORG_CURRENCY` — a rule with the right failure mode, since a future AUD store is included automatically and a future NZD one is not. **That also removed the need for the dependent-question machinery**: everything in these reports is Summit, so Source and Pharmacy are two independent questions.
+**Status:** done. Typecheck, lint and all three builds green by exit code after the commit; 735 API / 377 web / 127 shared. Verified on production: September Online went $845,030 → $823,049 (the $21,981 being Green Clinic), and ZOffice Sept splits Script 2,104 lines / $248,484, OTC 66 lines / $955. API restarted (health 200).
+**Why `product_type` is on `till_sales` and not `sales`:** one line is one product, so the type is unambiguous at line grain; **8,566 receipts hold more than one type**, so the receipt-grain `sales` dataset keeps money columns instead (ruling 7). `Unclassified` maps from a missing judgement to a real string, not NULL, so it can be filtered *for*.
+**Follow-up:**
+1. `BLANK NON-NHS` ($19,209) and `jack` ($10,735) are still `otc` though the evidence says script; `BLANK REPAT`/`BLANK S3R` likewise. The owner was told.
+2. **`order.shop_location` is wrong for Green Clinic** — 632 orders / $113,682 labelled `caloundra`, which is impossible for a New Zealand business. `backfill-shop-location` runs org-wide with Summit's checkout rules and will keep doing it. The `sales` dataset no longer sees them, but the org-wide `orders` dataset does, so a "sales by pharmacy" report there still counts NZ as Caloundra. **Fix: clear them and make the backfill store-aware.** Not done — needs the owner's go-ahead.
+3. Green Clinic's `store.timezone` says `Australia/Sydney` though it is in NZ, so its day boundaries are two hours out. Harmless while it is excluded; matters if Green Clinic ever gets its own reports (which would also need per-store currency, not one org constant).
+4. Classifying **website** products as script/OTC remains out of scope, awaiting the owner's ruling on the WooCommerce category names.
+
+### 2026-10-12 — Green Clinic locations cleared, backfill guarded, Woo categories on order lines [Claude Code]
+**Project:** SummitAutomation
+**Prompt/Task:** Three items from the owner: (1) he had flipped `BLANK NON-NHS` and `jack` to script; (2) "Greenclinic orders should not be labelled in caloundra. please update it"; (3) add the WooCommerce category from the website, but "we cannot afford a manual on the old product for a woocommerce category".
+**Changed:** Commit 1b3d17b. A live `UPDATE` cleared `shop_location` on **691** orders of stores without `owns_counter_sales`. `refuseStoreWithoutPharmacies` added to `backfill-shop-location.ts` (extracted so it is testable without MySQL) plus 3 tests. `categoriesField` in `org.ts`, used by both `products` (which already had an inline version) and `order_lines` (which did not), plus `test/reports/categories.test.ts`.
+**Why:** A New Zealand business cannot dispense from Queensland. The clear is scoped by the `owns_counter_sales` flag rather than by name, because `shop_location` means "which of OUR pharmacies dispensed this" and only the store running the registers has pharmacies. The guard matters because every rule in `decide()` ends in a catch-all — run against the wrong store the tool does not fail, it writes a confident `caloundra`, which is how 691 orders got mislabelled. For (3) the owner explicitly ruled out manual classification of old products, so the website's own categories are exposed verbatim: **text filtered with `contains`**, not an enum, because a product belongs to several at once.
