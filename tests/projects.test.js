@@ -85,6 +85,16 @@ test('marker is used only when no path match; warns when the marker project live
   fs.rmSync(existing, { recursive: true, force: true });
 });
 
+test('a directory named .aimemory on the walk path (the config dir) is not a marker', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'aimemory-dirmarker-'));
+  fs.mkdirSync(path.join(tmp, '.aimemory'));
+  const nested = path.join(tmp, 'Documents', 'proj');
+  fs.mkdirSync(nested, { recursive: true });
+  assert.equal(findMarker(nested), null);
+  assert.equal(detectProject({ cwd: nested, projects, memoryRoot }), null);
+  fs.rmSync(tmp, { recursive: true, force: true });
+});
+
 test('folder-name match is the last resort', () => {
   const r = detectProject({ cwd: 'X:/somewhere/SummitAutomation', projects, memoryRoot });
   assert.equal(r.project.folder, 'SummitAutomation');

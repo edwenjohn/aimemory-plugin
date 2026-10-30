@@ -70,7 +70,9 @@ function findMarker(cwd) {
   let dir = path.resolve(cwd);
   for (;;) {
     const candidate = path.join(dir, '.aimemory');
-    if (fs.existsSync(candidate)) {
+    let isFile = false;
+    try { isFile = fs.statSync(candidate).isFile(); } catch { /* absent */ }
+    if (isFile) {
       const folder = fs.readFileSync(candidate, 'utf8').split(/\r?\n/)[0].trim();
       if (folder) return { folder, markerPath: candidate };
     }
