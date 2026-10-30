@@ -43,9 +43,69 @@ function loadState(sessionId) {
   }
 }
 
+/** Write atomically (temp file + rename) so a concurrent reader never sees a half-written file. */
 function saveState(state) {
   fs.mkdirSync(sessionsDir(), { recursive: true });
-  fs.writeFileSync(statePath(state.sessionId), JSON.stringify(state, null, 2) + '\n', 'utf8');
+  const target = statePath(state.sessionId);
+  const tmp = `${target}.${process.pid}.${Date.now()}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(state, null, 2) + '\n', 'utf8');
+  try {
+    fs.renameSync(tmp, target);
+  } catch {
+    // Windows can refuse to rename over a file another process has open; fall back to a plain write.
+    fs.writeFileSync(target, JSON.stringify(state, null, 2) + '\n', 'utf8');
+    try { fs.unlinkSync(tmp); } catch { /* ignore */ }
+  }
+}
+
+function sleepMs(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+const LOCK_STALE_MS = 5000;
+const LOCK_WAIT_MS = 3000;
+
+/** Run fn while holding an exclusive lock file. Stale locks (> 5 s) are broken; after 3 s we proceed unlocked. */
+function withLock(lockPath, fn) {
+  const start = Date.now();
+  for (;;) {
+    let fd = null;
+    try {
+      fd = fs.openSync(lockPath, 'wx');
+    } catch (err) {
+      // EEXIST: someone holds the lock. EPERM/EACCES/EBUSY: Windows while another process is unlinking it.
+      if (!['EEXIST', 'EPERM', 'EACCES', 'EBUSY'].includes(err.code)) throw err;
+      try {
+        if (Date.now() - fs.statSync(lockPath).mtimeMs > LOCK_STALE_MS) { fs.unlinkSync(lockPath); continue; }
+      } catch { /* lock vanished; retry */ }
+      if (Date.now() - start > LOCK_WAIT_MS) return fn();
+      sleepMs(5 + Math.floor(Math.random() * 10));
+      continue;
+    }
+    try {
+      return fn();
+    } finally {
+      try { fs.closeSync(fd); } catch { /* ignore */ }
+      try { fs.unlinkSync(lockPath); } catch { /* ignore */ }
+    }
+  }
+}
+
+/**
+ * Load → mutate → save under a per-session lock, so hooks and CLI commands running
+ * in parallel never overwrite each other's changes. `init` (optional) creates the
+ * state when none exists. Returns the saved state, or null when there is none.
+ */
+function updateState(sessionId, mutate, init) {
+  fs.mkdirSync(sessionsDir(), { recursive: true });
+  return withLock(statePath(sessionId) + '.lock', () => {
+    let state = loadState(sessionId);
+    if (!state && init) state = init();
+    if (!state) return null;
+    mutate(state);
+    saveState(state);
+    return state;
+  });
 }
 
 function deleteState(sessionId) {
@@ -100,6 +160,6 @@ function sweep(maxAgeDays = 7) {
 }
 
 module.exports = {
-  UNREGISTERED, sessionsDir, statePath, newState, loadState, saveState, deleteState,
+  UNREGISTERED, sessionsDir, statePath, newState, loadState, saveState, deleteState, updateState, withLock,
   recordChange, unsavedProjects, sweep,
 };

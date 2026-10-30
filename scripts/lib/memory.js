@@ -10,8 +10,28 @@ function splitLines(md) {
   return String(md || '').split(/\r?\n/);
 }
 
+/** Majority line ending of the text; LF when tied or when there are no newlines. */
 function detectEol(md) {
-  return /\r\n/.test(String(md || '')) ? '\r\n' : '\n';
+  const s = String(md || '');
+  const crlf = (s.match(/\r\n/g) || []).length;
+  const lf = (s.match(/\n/g) || []).length - crlf;
+  return crlf > lf ? '\r\n' : '\n';
+}
+
+/** Read a file as raw bytes; empty buffer when absent. Never decodes what it will not write back. */
+function readBytes(filePath) {
+  try { return fs.readFileSync(filePath); } catch { return Buffer.alloc(0); }
+}
+
+/** Number of line endings at the very end of the buffer and the dominant EOL, decided from bytes only. */
+function tailInfo(buf) {
+  const eol = detectEol(buf.toString('latin1'));
+  let count = 0;
+  let i = buf.length;
+  for (;;) {
+    if (i >= 2 && buf[i - 2] === 0x0d && buf[i - 1] === 0x0a) { i -= 2; count++; } else if (i >= 1 && buf[i - 1] === 0x0a) { i -= 1; count++; } else break;
+  }
+  return { eol, trailingNewlines: count, empty: buf.length === 0 };
 }
 
 /**
@@ -82,28 +102,32 @@ function toEol(text, eol) {
   return String(text).replace(/\r?\n/g, eol);
 }
 
-/** Append an entry at the end of the file with exactly one blank line before it. */
+/**
+ * Append an entry at the end of the file with exactly one blank line before it.
+ * Append-only: existing bytes are never read-decoded-rewritten, so invalid UTF-8,
+ * a kill mid-write, or a concurrent appender can never damage earlier entries.
+ */
 function appendEntry(filePath, entryText) {
-  const existing = fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf8') : '';
-  const eol = detectEol(existing);
-  const body = existing.replace(/(\r?\n)+$/, '');
+  const buf = readBytes(filePath);
+  const { eol, trailingNewlines, empty } = tailInfo(buf);
   const entry = toEol(String(entryText).trim(), eol);
-  const out = body ? body + eol + eol + entry + eol : entry + eol;
-  fs.writeFileSync(filePath, out, 'utf8');
+  let sep = '';
+  if (!empty) sep = eol.repeat(Math.max(0, 2 - trailingNewlines));
+  fs.appendFileSync(filePath, sep + entry + eol, 'utf8');
 }
 
-/** Append `lines` to the end of the file only if the last entry's heading equals `heading`. */
+/** Append `lines` to the end of the file only if the last entry's heading equals `heading`. Append-only. */
 function appendToLastEntry(filePath, heading, lines) {
-  if (!fs.existsSync(filePath)) return false;
-  const existing = fs.readFileSync(filePath, 'utf8');
-  const entries = parseEntries(existing);
+  const buf = readBytes(filePath);
+  if (!buf.length) return false;
+  const entries = parseEntries(buf.toString('utf8'));
   if (!entries.length) return false;
   const last = entries[entries.length - 1];
   if (last.heading.trim() !== String(heading).trim()) return false;
-  const eol = detectEol(existing);
-  const body = existing.replace(/(\r?\n)+$/, '');
+  const { eol, trailingNewlines } = tailInfo(buf);
   const extra = lines.map((l) => toEol(String(l).trimEnd(), eol)).join(eol);
-  fs.writeFileSync(filePath, body + eol + extra + eol, 'utf8');
+  const sep = trailingNewlines === 0 ? eol : '';
+  fs.appendFileSync(filePath, sep + extra + eol, 'utf8');
   return true;
 }
 

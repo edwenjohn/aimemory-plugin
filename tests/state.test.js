@@ -97,3 +97,33 @@ test('sweep deletes state files older than 7 days only', () => {
   assert.equal(fs.existsSync(statePath('old')), false);
   assert.equal(fs.existsSync(statePath('new')), true);
 });
+
+// ---------- review fixes ----------
+
+const { updateState } = require('../scripts/lib/state');
+const { spawn } = require('node:child_process');
+
+test('updateState applies a mutation under a lock and returns the new state', () => {
+  saveState(newState({ sessionId: 'upd-1', tool: 'claude', cwd: 'c:/x', project: null }));
+  const r = updateState('upd-1', (s) => { s.paused = true; });
+  assert.equal(r.paused, true);
+  assert.equal(loadState('upd-1').paused, true);
+  assert.equal(updateState('missing', (s) => { s.paused = true; }), null);
+  assert.equal(fs.existsSync(statePath('upd-1') + '.lock'), false);
+});
+
+test('concurrent updateState calls from separate processes lose no writes (review C2 race)', async () => {
+  saveState(newState({ sessionId: 'race-1', tool: 'claude', cwd: 'c:/x', project: null }));
+  const script = `
+    const { updateState } = require(${JSON.stringify(path.join(__dirname, '..', 'scripts', 'lib', 'state.js'))});
+    for (let i = 0; i < 25; i++) updateState('race-1', (s) => { s.counter = (s.counter || 0) + 1; });
+  `;
+  const children = Array.from({ length: 4 }, () => new Promise((resolve, reject) => {
+    const p = spawn(process.execPath, ['-e', script], { env: { ...process.env, AIMEMORY_HOME: home }, stdio: ['ignore', 'ignore', 'pipe'] });
+    let err = '';
+    p.stderr.on('data', (d) => { err += d; });
+    p.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(err || `exit ${code}`))));
+  }));
+  await Promise.all(children);
+  assert.equal(loadState('race-1').counter, 100);
+});

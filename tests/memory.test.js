@@ -141,3 +141,38 @@ test('renderStub contains [auto-stub], the file list, tool and session id at the
   assert.ok(s2.includes('Codex'));
   assert.equal(parseEntries(s2)[0].isStub, true);
 });
+
+// ---------- review fixes ----------
+
+test('appendEntry never rewrites existing bytes, even invalid UTF-8 (review C1)', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aimemory-raw-'));
+  const file = path.join(dir, 'DynamicMemory.md');
+  const original = Buffer.concat([Buffer.from('## 2026-01-01 — a \xe2\x80\x94 ok\nline with bare cp1252 dash: ', 'latin1'), Buffer.from([0x97]), Buffer.from('\nmore\n')]);
+  fs.writeFileSync(file, original);
+  appendEntry(file, '## 2026-01-02 — b\nbody');
+  const after = fs.readFileSync(file);
+  assert.ok(after.subarray(0, original.length).equals(original), 'original bytes untouched');
+  assert.equal(after.subarray(original.length).toString('utf8'), '\n## 2026-01-02 — b\nbody\n');
+});
+
+test('appendToLastEntry also only appends bytes', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aimemory-raw2-'));
+  const file = path.join(dir, 'DynamicMemory.md');
+  const original = Buffer.concat([Buffer.from('## 2026-01-01 — a\n'), Buffer.from([0x97]), Buffer.from('\n')]);
+  fs.writeFileSync(file, original);
+  assert.equal(appendToLastEntry(file, 'a', ['**Follow-up:** x']), true);
+  const after = fs.readFileSync(file);
+  assert.ok(after.subarray(0, original.length).equals(original));
+  assert.equal(after.subarray(original.length).toString('utf8'), '**Follow-up:** x\n');
+});
+
+test('appendEntry on a file with no trailing newline adds exactly one blank line', () => {
+  const file = tmpCopy('## 2026-01-01 — a\nbody');
+  appendEntry(file, '## 2026-01-02 — b');
+  assert.equal(fs.readFileSync(file, 'utf8'), '## 2026-01-01 — a\nbody\n\n## 2026-01-02 — b\n');
+});
+
+test('detectEol uses the majority ending, not any stray CR (review minor)', () => {
+  assert.equal(detectEol('a\nb\nc\r\nd\ne\n'), '\n');
+  assert.equal(detectEol('a\r\nb\r\nc\nd\r\n'), '\r\n');
+});
