@@ -16,11 +16,11 @@ Requirements: Node.js 18 or newer on PATH (both tools already need it). No npm i
 ### Claude Code (CLI, desktop app, VS Code extension)
 
 ```
-claude plugin marketplace add C:\Users\AU\Documents\aimemory-plugin
+claude plugin marketplace add edwenjohn/aimemory-plugin
 claude plugin install aimemory@aimemory
 ```
 
-Replace the path with the GitHub URL once the repo is published. Start a new session anywhere; the plugin will say no memory path is set. Then:
+(From a local clone instead: `claude plugin marketplace add C:\path\to\aimemory-plugin`.) Start a new session anywhere; the plugin will say no memory path is set. Then:
 
 ```
 /aimemory:path F:\AI Memory Framework
