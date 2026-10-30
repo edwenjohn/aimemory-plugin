@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Install the aimemory plugin into Codex (CLI, desktop app and IDE extension share ~/.codex).
 #
-# 1. Copies this repo to ~/.codex/plugins/aimemory
+# 1. Copies this repo to ~/.agents/plugins/aimemory (next to the personal marketplace file,
+#    so the marketplace entry can use the documented "./"-relative path)
 # 2. Adds an "aimemory" entry to ~/.agents/plugins/marketplace.json (merging, never clobbering other entries)
 # 3. Prints the remaining manual steps (enable, run setup, trust hooks)
 #
@@ -9,10 +10,9 @@
 set -euo pipefail
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-codex_home="${CODEX_HOME:-$HOME/.codex}"
-plugin_dir="$codex_home/plugins/aimemory"
 marketplace_dir="$HOME/.agents/plugins"
 marketplace_file="$marketplace_dir/marketplace.json"
+plugin_dir="$marketplace_dir/aimemory"
 
 echo "Installing aimemory from $repo"
 
@@ -36,7 +36,8 @@ if (fs.existsSync(file)) {
 market.plugins = (market.plugins || []).filter((p) => p && p.name !== 'aimemory');
 market.plugins.push({
   name: 'aimemory',
-  source: { source: 'local', path: pluginDir },
+  source: { source: 'local', path: './aimemory' }, // relative to the marketplace file, per the Codex docs
+
   policy: { installation: 'AVAILABLE', authentication: 'ON_INSTALL' },
   category: 'Productivity',
 });

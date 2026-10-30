@@ -1,6 +1,7 @@
 # Install the aimemory plugin into Codex (CLI, desktop app and IDE extension share ~/.codex).
 #
-# 1. Copies this repo to ~/.codex/plugins/aimemory
+# 1. Copies this repo to ~/.agents/plugins/aimemory (next to the personal marketplace file,
+#    so the marketplace entry can use the documented "./"-relative path)
 # 2. Adds an "aimemory" entry to ~/.agents/plugins/marketplace.json (merging, never clobbering other entries)
 # 3. Prints the remaining manual steps (enable, run setup, trust hooks)
 #
@@ -8,10 +9,9 @@
 
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
-$codexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $env:USERPROFILE '.codex' }
-$pluginDir = Join-Path (Join-Path $codexHome 'plugins') 'aimemory'
 $marketplaceDir = Join-Path $env:USERPROFILE '.agents\plugins'
 $marketplaceFile = Join-Path $marketplaceDir 'marketplace.json'
+$pluginDir = Join-Path $marketplaceDir 'aimemory'
 
 Write-Host "Installing aimemory from $repo"
 
@@ -33,7 +33,7 @@ Write-Host "Copied to $pluginDir"
 New-Item -ItemType Directory -Force -Path $marketplaceDir | Out-Null
 $entry = [ordered]@{
     name     = 'aimemory'
-    source   = [ordered]@{ source = 'local'; path = $pluginDir }
+    source   = [ordered]@{ source = 'local'; path = './aimemory' }
     policy   = [ordered]@{ installation = 'AVAILABLE'; authentication = 'ON_INSTALL' }
     category = 'Productivity'
 }
@@ -45,7 +45,8 @@ if (Test-Path $marketplaceFile) {
 } else {
     $market = [ordered]@{ name = 'personal'; plugins = @($entry) }
 }
-($market | ConvertTo-Json -Depth 6) | Out-File -FilePath $marketplaceFile -Encoding utf8
+# Plain UTF-8 without a BOM: Out-File -Encoding utf8 writes a BOM on PowerShell 5.1, which strict JSON parsers reject.
+[System.IO.File]::WriteAllText($marketplaceFile, (($market | ConvertTo-Json -Depth 6) + "`n"), (New-Object System.Text.UTF8Encoding $false))
 Write-Host "Marketplace entry written to $marketplaceFile"
 
 Write-Host ''

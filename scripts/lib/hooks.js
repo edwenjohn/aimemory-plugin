@@ -7,11 +7,17 @@ const {
   parseEntries, lastEntries, appendEntry, buildMemoryPayload, dominantLevel, renderStub, sections,
 } = require('./memory');
 const {
-  newState, loadState, saveState, deleteState, recordChange, unsavedProjects, sweep,
+  newState, loadState, saveState, deleteState, updateState, recordChange, unsavedProjects, sweep,
 } = require('./state');
 const { logInfo } = require('./log');
 
 const TOOL_LABEL = { claude: 'Claude Code', codex: 'Codex' };
+/** Absolute path of the CLI, so hook output can quote a command the agent can run from any shell. */
+const CLI_PATH = path.resolve(__dirname, '..', 'aimemory.js').replace(/\\/g, '/');
+
+function sessionLine(sessionId) {
+  return `- Session id: ${sessionId || 'unknown'} (pass it as --session to aimemory commands such as save, pause and status).`;
+}
 
 /** Tool-specific spelling of a skill command. */
 function cmd(tool, skill) {
@@ -59,7 +65,7 @@ function protocolSummary(tool, project) {
 }
 
 /** Spec §6.3 payload. `source: "compact"` gives the short form. */
-function buildContext({ project, memoryMd, dynamicMd, cfg, source, tool }) {
+function buildContext({ project, memoryMd, dynamicMd, cfg, source, tool, sessionId }) {
   const parts = [];
   const stubs = parseEntries(dynamicMd).filter((e) => e.isStub);
   if (source === 'compact') {
@@ -79,7 +85,7 @@ function buildContext({ project, memoryMd, dynamicMd, cfg, source, tool }) {
   if (stubs.length) {
     parts.push(`## Open [auto-stub] entries (${stubs.length})\nThe plugin wrote these when a session ended with unlogged changes. Expand or correct them first, then continue:\n` + stubs.map((e) => `- ${e.date} — ${e.heading}`).join('\n'));
   }
-  parts.push(protocolSummary(tool, project));
+  parts.push(protocolSummary(tool, project) + '\n' + sessionLine(sessionId));
   return parts.join('\n\n');
 }
 
@@ -98,18 +104,14 @@ function sessionStart(input, deps = {}) {
     return sessionStartOutput(msg, 'aimemory: no memory path set. Run ' + cmd(tool, 'path') + ' <folder>.');
   }
   sweep(7);
-  const existing = loadState(input.session_id);
   if (!memoryRootReachable(cfg)) {
-    const state = existing || newState({ sessionId: input.session_id, tool, cwd, project: null });
-    state.warnedUnreachable = true;
-    saveState(state);
+    updateState(input.session_id, (s) => { s.warnedUnreachable = true; }, () => newState({ sessionId: input.session_id, tool, cwd, project: null }));
     return { systemMessage: `aimemory: memory root ${cfg.memoryRoot} is not reachable (drive unplugged?). Memory was not loaded and nothing will be saved this session.` };
   }
   const projects = loadProjects(cfg);
   const det = detectProject({ cwd, projects, memoryRoot: cfg.memoryRoot });
   const folder = det ? det.project.folder : null;
-  const state = existing ? { ...existing, cwd, project: folder } : newState({ sessionId: input.session_id, tool, cwd, project: folder });
-  saveState(state);
+  updateState(input.session_id, (s) => { s.cwd = cwd; s.project = folder; }, () => newState({ sessionId: input.session_id, tool, cwd, project: folder }));
   if (!det) {
     if (looksLikeProject(cwd)) {
       return sessionStartOutput(`This folder is not registered in the AI Memory Framework (${cfg.memoryRoot}). If it is a project worth remembering, run ${cmd(tool, 'init')} to register it; otherwise ignore this.`);
@@ -118,7 +120,7 @@ function sessionStart(input, deps = {}) {
   }
   const memoryMd = readIfExists(det.project.memoryFile);
   const dynamicMd = readIfExists(det.project.dynamicFile);
-  const text = buildContext({ project: det.project, memoryMd, dynamicMd, cfg, source: input.source, tool });
+  const text = buildContext({ project: det.project, memoryMd, dynamicMd, cfg, source: input.source, tool, sessionId: input.session_id });
   return sessionStartOutput(text, det.warning ? `aimemory: ${det.warning}` : undefined);
 }
 
@@ -145,13 +147,14 @@ function postToolUse(input, deps = {}) {
   const paths = extractPathsFromToolInput(input.tool_name, input.tool_input, input.cwd);
   if (!paths.length) return {};
   const projects = loadProjects(cfg);
-  let state = loadState(input.session_id);
-  if (!state) {
-    const det = detectProject({ cwd: input.cwd || process.cwd(), projects, memoryRoot: cfg.memoryRoot });
-    state = newState({ sessionId: input.session_id, tool, cwd: input.cwd, project: det ? det.project.folder : null });
-  }
-  for (const p of paths) recordChange(state, p, projects, cfg.ignore, cfg.memoryRoot);
-  saveState(state);
+  updateState(
+    input.session_id,
+    (state) => { for (const p of paths) recordChange(state, p, projects, cfg.ignore, cfg.memoryRoot); },
+    () => {
+      const det = detectProject({ cwd: input.cwd || process.cwd(), projects, memoryRoot: cfg.memoryRoot });
+      return newState({ sessionId: input.session_id, tool, cwd: input.cwd, project: det ? det.project.folder : null });
+    },
+  );
   return {};
 }
 
@@ -173,16 +176,14 @@ function stop(input, deps = {}) {
   if (input.stop_hook_active) return {};
   if (!memoryRootReachable(cfg)) {
     if (state.warnedUnreachable) return {};
-    state.warnedUnreachable = true;
-    saveState(state);
+    updateState(input.session_id, (s) => { s.warnedUnreachable = true; });
     return { systemMessage: `aimemory: memory root ${cfg.memoryRoot} is not reachable, so this session's changes cannot be logged.` };
   }
   const unsaved = unsavedProjects(state);
   if (!unsaved.length) {
     const unreg = state.changes._unregistered || [];
     if (unreg.length && !state.warnedUnregistered) {
-      state.warnedUnregistered = true;
-      saveState(state);
+      updateState(input.session_id, (s) => { s.warnedUnregistered = true; });
       return { systemMessage: `aimemory: ${unreg.length} file(s) changed outside any registered project. Run ${cmd(tool, 'init')} if this folder is a project worth remembering.` };
     }
     return {};
@@ -199,12 +200,18 @@ function stop(input, deps = {}) {
       },
     };
   }
-  state.blockedOnce = true;
-  saveState(state);
+  updateState(input.session_id, (s) => { s.blockedOnce = true; });
+  const commands = unsaved.map((u) => {
+    const extend = state.entryHeading && state.entryHeading[u.folder] ? ' --extend' : '';
+    return `node "${CLI_PATH}" append-entry --project ${u.folder} --session ${input.session_id} --file <path to a UTF-8 file holding the entry>${extend}`;
+  });
   const reason = [
     `You changed files in ${unsaved.map((u) => u.folder).join(', ')} and have not logged the work in the AI Memory Framework.`,
     ...lines.map((l) => `- ${l}`),
-    `Append one entry to each project's DynamicMemory.md now, following that file's own Entry template (run ${cmd(tool, 'save')}: it reads the template, lists the changed files, and appends for you). Then stop.`,
+    `Session id: ${input.session_id}`,
+    `Append one entry to each project's DynamicMemory.md now, following that file's own Entry template (${cmd(tool, 'save')} explains the format). Write the entry to a temp file named aimemory-entry.md as UTF-8, then run:`,
+    ...commands.map((c) => `  ${c}`),
+    'Then stop.',
   ].join('\n');
   logInfo(`Stop blocked session ${input.session_id} (${tool}) for ${unsaved.map((u) => u.folder).join(',')}`);
   return { decision: 'block', reason };

@@ -23,7 +23,7 @@ Fix the stable reference in place. `Memory.md` holds knowledge that should stay 
    - Add or refresh a line `_Last verified: YYYY-MM-DD_` at the end of the section you changed.
    - If a fact moved from one section to another, remove the old copy so there is one source of truth.
 
-4. Record the correction in the work log with a one-line follow-up. Write a file containing a single line such as `**Follow-up:** Memory.md §4 corrected: build now uses Vite 8, not webpack.` and run:
+4. Record the correction in the work log with a one-line follow-up. Write a UTF-8 file `aimemory-entry.md` containing a single line such as `**Follow-up:** Memory.md §4 corrected: build now uses Vite 8, not webpack.` and run (the Session id is in the session-start context and in Stop hook messages; omit `--session` to let the CLI pick the session for this folder):
 
    ```
    node "${CLAUDE_PLUGIN_ROOT}/scripts/aimemory.js" append-entry --project <folder> --session <session_id> --file <tempfile> --extend

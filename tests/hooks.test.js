@@ -304,3 +304,32 @@ test('sessionEnd writes no stub when saved, when nothing changed, or when the ro
 test('loadConfig sanity for this suite', () => {
   assert.equal(loadConfig().memoryRoot, memoryRoot);
 });
+
+// ---------- review fixes ----------
+
+test('stop block reason tells the agent its session id and the exact append-entry command (review C2)', () => {
+  stateWithChange('sid-1');
+  const r = run('hook-stop', stopInput('claude', repoDir, 'sid-1'), ['--tool', 'claude']).json;
+  assert.equal(r.decision, 'block');
+  assert.match(r.reason, /Session id: sid-1/);
+  assert.match(r.reason, /append-entry --project SummitPharma-Child-Theme --session sid-1 --file/);
+  assert.match(r.reason, /UTF-8/);
+});
+
+test('sessionStart context carries the session id (review C2)', () => {
+  const r = run('hook-session-start', startInput('claude', repoDir, 'startup', 'sid-start'), ['--tool', 'claude']).json;
+  assert.match(r.hookSpecificOutput.additionalContext, /Session id: sid-start/);
+  const c = run('hook-session-start', startInput('codex', repoDir, 'compact', 'sid-compact'), ['--tool', 'codex']).json;
+  assert.match(c.hookSpecificOutput.additionalContext, /Session id: sid-compact/);
+});
+
+test('the temp entry file a save writes is never recorded as a change (review: spurious unregistered warning)', () => {
+  run('hook-session-start', startInput('claude', repoDir, 'startup', 'tmp-1'), ['--tool', 'claude']);
+  const w = {
+    session_id: 'tmp-1', cwd: repoDir, hook_event_name: 'PostToolUse', tool_name: 'Write',
+    tool_input: { file_path: path.join(os.tmpdir(), 'aimemory-entry-smoke.md'), content: '### x' },
+  };
+  run('hook-post-tool-use', w, ['--tool', 'claude']);
+  const st = loadState('tmp-1');
+  assert.deepEqual(st.changes, {});
+});

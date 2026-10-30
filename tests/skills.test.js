@@ -65,3 +65,13 @@ test('the protocol summary used by hooks substitutes placeholders per tool', () 
   assert.match(x, /\$aimemory-save/);
   assert.ok(!x.includes('/aimemory:'));
 });
+
+test('skills that need the session id say where it comes from (review C2)', () => {
+  for (const name of ['save', 'pause', 'update', 'status']) {
+    const md = fs.readFileSync(path.join(SKILLS, name, 'SKILL.md'), 'utf8');
+    assert.match(md, /Session id/, `${name}: must explain the session id`);
+  }
+  const save = fs.readFileSync(path.join(SKILLS, 'save', 'SKILL.md'), 'utf8');
+  assert.ok(!/hook will still see the file write/.test(save), 'save: remove the false claim');
+  assert.match(save, /UTF-8/);
+});

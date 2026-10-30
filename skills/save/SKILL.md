@@ -14,7 +14,7 @@ Append this session's work to the project's `DynamicMemory.md`, following that f
    node "${CLAUDE_PLUGIN_ROOT}/scripts/aimemory.js" status --session <session_id> --cwd <cwd>
    ```
 
-   `unsaved` lists registered projects with changed files. `state.entryHeading[<folder>]` is set when this session already logged that project. If you do not know the session id, skip `--session`: you will write a full entry and the hook will still see the file write.
+   `unsaved` lists registered projects with changed files. `state.entryHeading[<folder>]` is set when this session already logged that project. The Session id is printed in the session-start context ("Session id: …") and in every Stop hook message. If you do not have it, omit `--session`: the CLI picks the one session with unsaved changes for the project and reports which (`session` in the result); if several match it says so and you must pass the id.
 
 2. Get the template for each project to log:
 
@@ -24,7 +24,7 @@ Append this session's work to the project's `DynamicMemory.md`, following that f
 
    Use `template` if present; otherwise use the default in `${CLAUDE_PLUGIN_ROOT}/skills/_references/entry-format.md`.
 
-3. Write the entry text to a temporary file (for example `aimemory-entry.md` in the OS temp directory). Fill every template field from what you actually did:
+3. Write the entry text, **as UTF-8**, to a temporary file named `aimemory-entry.md` in the OS temp directory (that name is ignored by the change tracker; in PowerShell use `Set-Content -Encoding utf8`). Fill every template field from what you actually did:
    - Heading: today's date, a short title, and the agent tag `[Claude Code]`.
    - **Changed:** exact file paths, with functions or line ranges where useful. Include shell-only work (builds, migrations, commands) that the hook could not see.
    - **Why:** the business or technical reason.

@@ -11,6 +11,7 @@ const DEFAULTS = Object.freeze({
   ignore: [
     '**/*.min.css', '**/*.min.js', '**/*.map', '**/*.zip', '**/package-lock.json',
     '**/node_modules/**', '**/dist/**', '**/build/**', '**/.claude/**', '**/.codex/**',
+    '**/aimemory-entry*.md',
   ],
 });
 

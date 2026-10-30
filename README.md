@@ -33,7 +33,7 @@ powershell -ExecutionPolicy Bypass -File scripts\install-codex.ps1     # Windows
 bash scripts/install-codex.sh                                          # macOS / Linux / Git Bash
 ```
 
-The script copies the plugin to `~/.codex/plugins/aimemory` and adds it to your personal marketplace `~/.agents/plugins/marketplace.json`. Then, in Codex:
+The script copies the plugin to `~/.agents/plugins/aimemory` and adds it to your personal marketplace `~/.agents/plugins/marketplace.json` with the documented `./aimemory` relative path. Then, in Codex:
 
 1. Restart Codex, open the plugin browser, enable **AI Memory**.
 2. Run its setup (the onboarding skill is the path skill) and give it the memory folder, or type `$aimemory-path F:\AI Memory Framework` in any session.
@@ -119,9 +119,10 @@ Design: `docs/superpowers/specs/2026-10-30-aimemory-plugin-design.md` and the ma
 
 - SessionStart injected the project's memory: the agent named "SummitPharma Child Theme" and the newest DynamicMemory.md entry without using tools.
 - Writing a scratch file then stopping: the Stop hook blocked once (`hooks.log`: "Stop blocked session … for SummitPharma-Child-Theme"), the agent appended an entry following the file's own h3 Entry template, then stopped.
-- SessionEnd wrote an `[auto-stub]` when the session's save went to a different root than the configured one (test artifact: the project's own AGENTS.md hardcodes `F:\AI Memory Framework`, which is where it saved; in normal use the configured root and AGENTS.md agree).
+- SessionEnd wrote an `[auto-stub]` in that run even though the entry had been appended. Root cause (found in review): the PostToolUse hook and the `append-entry` command ran in parallel and raced on the session state file, so the "saved" flag was lost. Fixed since: all state updates go through a per-session lock, and the hooks now tell the agent its session id so `append-entry --session <id>` always lands on the right state.
 - Known quirk: one `claude -p` run left its session state file behind (SessionEnd did not fire on that run). Harmless; state files are swept after 7 days.
+- SessionEnd budget: Claude Code gives SessionEnd hooks about 1.5 s regardless of the hook's own `timeout` (raise with `CLAUDE_CODE_SESSIONEND_HOOKS_TIMEOUT_MS`); Codex caps it at 3 s. The stub write is a single append, well inside both.
 
-**Codex: installed, not yet verified in a session.** `scripts/install-codex.ps1` copied the plugin to `~/.codex/plugins/aimemory` and wrote the marketplace entry. This machine has the Codex desktop app but no `codex` CLI on PATH, so the remaining steps are manual: enable **AI Memory** in the plugin browser, run setup (or `$aimemory-path F:\AI Memory Framework`), trust the hooks via `/hooks`, then check `$aimemory-status`. Two things to confirm there and record here: that Codex honours the compat manifest's `skills: ./codex-skills/` path (if not, see the fallback in the design doc §5), and whether the desktop app runs SessionStart hooks.
+**Codex: installed, not yet verified in a session.** `scripts/install-codex.ps1` copied the plugin to `~/.agents/plugins/aimemory` and wrote the marketplace entry with the `./aimemory` relative path. This machine has the Codex desktop app but no `codex` CLI on PATH, so the remaining steps are manual: enable **AI Memory** in the plugin browser, run setup (or `$aimemory-path F:\AI Memory Framework`), trust the hooks via `/hooks`, then check `$aimemory-status`. Things to confirm there and record here: that the plugin appears at all (if not, try an absolute `source.path`), that Codex honours the compat manifest's `skills: ./codex-skills/` path (fallback in the design doc §5), that `${PLUGIN_ROOT}` is substituted in hook commands on Windows (else add `commandWindows` forms), and whether the desktop app runs SessionStart hooks.
 
 **Projects with their own AGENTS.md.** Existing per-project instruction files that hardcode `F:\AI Memory Framework\…` keep working and the agent will follow them; they simply agree with the plugin. If the memory store ever moves, update those files as well as `/aimemory:path`.

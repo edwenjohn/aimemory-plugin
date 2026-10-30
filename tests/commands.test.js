@@ -121,7 +121,7 @@ test('status reports config, detection, state and hook log tail', () => {
   assert.deepEqual(r.unsaved, [{ folder: 'SummitPharma-Child-Theme', files: ['x.php'] }]);
   assert.ok(Array.isArray(r.hooksLog));
   const noSession = run(['status', '--cwd', repoDir]).json;
-  assert.equal(noSession.state, null);
+  assert.equal(noSession.state.sessionId, 'st-1', 'without --session, the single session for this folder is used');
 });
 
 test('mark-saved, pause and resume update the session state', () => {
@@ -244,4 +244,59 @@ test('--text prints human-readable output instead of JSON', () => {
   const r = run(['list', '--text']);
   assert.equal(r.json, null);
   assert.match(r.out, /SummitPharma Child Theme/);
+});
+
+// ---------- review fixes ----------
+
+test('append-entry without --session falls back to the one session with unsaved changes for the project (review C2)', () => {
+  const dyn = path.join(memoryRoot, 'SummitPharma-Child-Theme', 'DynamicMemory.md');
+  const original = fs.readFileSync(dyn, 'utf8');
+  fs.rmSync(path.join(home, '.aimemory', 'sessions'), { recursive: true, force: true });
+  const s = newState({ sessionId: 'fb-1', tool: 'claude', cwd: repoDir, project: 'SummitPharma-Child-Theme' });
+  s.changes['SummitPharma-Child-Theme'] = ['x.php']; s.saved['SummitPharma-Child-Theme'] = false; saveState(s);
+  saveState(newState({ sessionId: 'fb-other', tool: 'codex', cwd: 'c:/elsewhere', project: null }));
+  const entryFile = path.join(home, 'fb-entry.md');
+  fs.writeFileSync(entryFile, '### 2026-10-30 — Fallback [Claude Code]\n**Status:** done\n');
+  const r = run(['append-entry', '--project', 'SummitPharma-Child-Theme', '--file', entryFile]).json;
+  assert.equal(r.appended, true);
+  assert.equal(r.stateUpdated, true);
+  assert.equal(r.session, 'fb-1');
+  assert.equal(loadState('fb-1').saved['SummitPharma-Child-Theme'], true);
+  // Ambiguous: two unsaved sessions for the same project -> still appends, but says so.
+  const s2 = newState({ sessionId: 'fb-2', tool: 'claude', cwd: repoDir, project: 'SummitPharma-Child-Theme' });
+  s2.changes['SummitPharma-Child-Theme'] = ['y.php']; s2.saved['SummitPharma-Child-Theme'] = false; saveState(s2);
+  const s3 = newState({ sessionId: 'fb-3', tool: 'claude', cwd: repoDir, project: 'SummitPharma-Child-Theme' });
+  s3.changes['SummitPharma-Child-Theme'] = ['z.php']; s3.saved['SummitPharma-Child-Theme'] = false; saveState(s3);
+  const a = run(['append-entry', '--project', 'SummitPharma-Child-Theme', '--file', entryFile]).json;
+  assert.equal(a.appended, true);
+  assert.equal(a.stateUpdated, false);
+  assert.match(a.warning, /fb-2.*fb-3|fb-3.*fb-2/);
+  fs.writeFileSync(dyn, original);
+});
+
+test('pause/resume/status without --session use the single session for the current folder (review C2)', () => {
+  fs.rmSync(path.join(home, '.aimemory', 'sessions'), { recursive: true, force: true });
+  assert.match(run(['pause', '--cwd', repoDir]).json.error, /no session/i);
+  saveState(newState({ sessionId: 'cw-1', tool: 'claude', cwd: repoDir, project: 'SummitPharma-Child-Theme' }));
+  assert.equal(run(['pause', '--cwd', repoDir]).json.paused, true);
+  assert.equal(run(['pause', '--cwd', repoDir]).json.session, 'cw-1');
+  assert.equal(run(['status', '--cwd', repoDir]).json.state.sessionId, 'cw-1');
+  saveState(newState({ sessionId: 'cw-2', tool: 'codex', cwd: repoDir, project: 'SummitPharma-Child-Theme' }));
+  assert.match(run(['resume', '--cwd', repoDir]).json.error, /cw-1.*cw-2|cw-2.*cw-1/);
+});
+
+test('append-entry decodes a UTF-16 BOM file and refuses mojibake (review I1)', () => {
+  const dyn = path.join(memoryRoot, 'SummitPharma-Child-Theme', 'DynamicMemory.md');
+  const original = fs.readFileSync(dyn, 'utf8');
+  const u16 = path.join(home, 'u16.md');
+  fs.writeFileSync(u16, Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from('### 2026-10-30 — UTF-16 entry [Claude Code]\n**Status:** done\n', 'utf16le')]));
+  const r = run(['append-entry', '--project', 'SummitPharma-Child-Theme', '--file', u16]).json;
+  assert.equal(r.appended, true);
+  assert.ok(fs.readFileSync(dyn, 'utf8').includes('— UTF-16 entry [Claude Code]'));
+  const bad = path.join(home, 'bad-enc.md');
+  fs.writeFileSync(bad, Buffer.concat([Buffer.from('### 2026-10-30 ', 'utf8'), Buffer.from([0x97]), Buffer.from(' cp1252 dash [Claude Code]\n**Status:** done\n', 'utf8')]));
+  const b = run(['append-entry', '--project', 'SummitPharma-Child-Theme', '--file', bad]).json;
+  assert.match(b.error, /UTF-8/);
+  assert.equal(b.appended, undefined);
+  fs.writeFileSync(dyn, original);
 });

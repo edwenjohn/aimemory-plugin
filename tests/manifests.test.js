@@ -49,7 +49,7 @@ test('Codex portable manifest, compatibility manifest and repo marketplace', () 
 function checkHooks(file, tool, postMatcher, rootVar) {
   const h = read(file).hooks;
   assert.deepEqual(Object.keys(h).sort(), ['PostToolUse', 'SessionEnd', 'SessionStart', 'Stop']);
-  assert.equal(h.SessionStart[0].matcher, 'startup|resume|clear|compact');
+  assert.equal(h.SessionStart[0].matcher, 'startup|resume|clear|compact|fork');
   assert.equal(h.PostToolUse[0].matcher, postMatcher);
   for (const [event, groups] of Object.entries(h)) {
     for (const g of groups) {

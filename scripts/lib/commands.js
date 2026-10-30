@@ -7,7 +7,7 @@ const { parseProjectsIndex, detectProject, resolveProjectArg, appendProjectRow }
 const {
   parseEntries, lastEntries, extractEntryTemplate, dominantLevel, appendEntry, appendToLastEntry, buildMemoryPayload,
 } = require('./memory');
-const { loadState, saveState, unsavedProjects } = require('./state');
+const { loadState, updateState, unsavedProjects, sessionsDir } = require('./state');
 const { tailLog } = require('./log');
 const { loadProjects } = require('./hooks');
 
@@ -153,23 +153,69 @@ function cmdStatus(args, flags) {
     out.detected = det ? { project: det.project, method: det.method, warning: det.warning } : { project: null };
     out.projectCount = projects.length;
   }
-  if (flags.session) {
-    const st = loadState(String(flags.session));
+  const res = resolveSession(flags, { cwd: cwdOf(flags) });
+  if (res.id) {
+    const st = loadState(res.id);
     out.state = st;
     out.unsaved = st ? unsavedProjects(st) : [];
+  } else if (res.ambiguous) {
+    out.sessionCandidates = res.ambiguous;
   }
   return out;
 }
 
 // ---------------------------------------------------------------- session state commands
 
+/** Every live session state, newest first. */
+function allStates() {
+  const dir = sessionsDir();
+  if (!fs.existsSync(dir)) return [];
+  const out = [];
+  for (const name of fs.readdirSync(dir)) {
+    if (!name.endsWith('.json')) continue;
+    try { out.push(JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8'))); } catch { /* half-written or stale */ }
+  }
+  return out.sort((a, b) => String(b.startedAt).localeCompare(String(a.startedAt)));
+}
+
+/**
+ * Work out which session a command refers to when the agent did not pass --session.
+ * `project`: prefer the single session with unsaved changes for that folder, else the
+ * single session whose detected project is that folder. `cwd`: the single session whose
+ * cwd is this folder or a parent of it. Returns { id } | { ambiguous: [ids] } | { none: true }.
+ */
+function resolveSession(flags, { project, cwd } = {}) {
+  if (flags.session) return { id: String(flags.session) };
+  const states = allStates();
+  const pick = (list) => (list.length === 1 ? { id: list[0].sessionId } : list.length > 1 ? { ambiguous: list.map((s) => s.sessionId) } : null);
+  if (project) {
+    const unsaved = states.filter((s) => (s.changes[project] || []).length && !s.saved[project]);
+    const r1 = pick(unsaved);
+    if (r1) return r1;
+    const same = states.filter((s) => s.project === project);
+    const r2 = pick(same);
+    if (r2) return r2;
+  }
+  if (cwd) {
+    const here = states.filter((s) => s.cwd && isInside(cwd, s.cwd));
+    const r3 = pick(here);
+    if (r3) return r3;
+  }
+  return { none: true };
+}
+
+function sessionError(res) {
+  if (res.ambiguous) return { error: `several sessions match (${res.ambiguous.join(', ')}); pass --session <id>. The id is in the session-start context and in the Stop hook message.` };
+  return { error: 'no session state matches; pass --session <id> (shown in the session-start context and in the Stop hook message). The hooks create the state at session start.' };
+}
+
 function withState(flags, fn) {
-  if (!flags.session) return { error: 'missing --session <id>' };
-  const st = loadState(String(flags.session));
-  if (!st) return { error: `no session state for ${flags.session}. The hooks create it at session start.` };
-  const out = fn(st);
-  saveState(st);
-  return out;
+  const res = resolveSession(flags, { cwd: cwdOf(flags) });
+  if (!res.id) return sessionError(res);
+  let out = null;
+  const updated = updateState(res.id, (st) => { out = fn(st); });
+  if (!updated) return { error: `no session state for ${res.id}. The hooks create it at session start.` };
+  return { ...out, session: res.id };
 }
 
 function cmdPause(args, flags) {
@@ -296,6 +342,25 @@ function cmdInit(args, flags) {
 
 // ---------------------------------------------------------------- append-entry
 
+/** Decode an entry file by its BOM (UTF-8, UTF-16 LE/BE), defaulting to UTF-8. Returns { text } or { error }. */
+function decodeEntryFile(buf) {
+  let text;
+  if (buf.length >= 2 && buf[0] === 0xff && buf[1] === 0xfe) {
+    text = buf.subarray(2).toString('utf16le');
+  } else if (buf.length >= 2 && buf[0] === 0xfe && buf[1] === 0xff) {
+    const swapped = Buffer.from(buf.subarray(2));
+    for (let i = 0; i + 1 < swapped.length; i += 2) { const t = swapped[i]; swapped[i] = swapped[i + 1]; swapped[i + 1] = t; }
+    text = swapped.toString('utf16le');
+  } else {
+    const body = buf.length >= 3 && buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf ? buf.subarray(3) : buf;
+    text = body.toString('utf8');
+  }
+  if (text.includes('�')) {
+    return { error: 'the entry file is not valid UTF-8 (undecodable bytes found, typically a cp1252 em dash or quote). Write it as UTF-8: in PowerShell use `Set-Content -Encoding utf8` or `Out-File -Encoding utf8`; in Node/Python write with encoding utf-8.' };
+  }
+  return { text };
+}
+
 function cmdAppendEntry(args, flags) {
   const r = requireConfig();
   if (r.error) return r;
@@ -303,9 +368,12 @@ function cmdAppendEntry(args, flags) {
   const project = r.projects.find((p) => p.folder.toLowerCase() === folder.toLowerCase());
   if (!project) return { error: `unknown project folder ${folder || '(none)'}; pass --project <folder>` };
   if (!flags.file || !fs.existsSync(String(flags.file))) return { error: 'missing or unreadable --file <path to entry text>' };
-  const text = fs.readFileSync(String(flags.file), 'utf8').replace(/\r\n/g, '\n').trim();
+  const decoded = decodeEntryFile(fs.readFileSync(String(flags.file)));
+  if (decoded.error) return decoded;
+  const text = decoded.text.replace(/\r\n/g, '\n').trim();
   if (!text) return { error: 'entry file is empty' };
-  const st = flags.session ? loadState(String(flags.session)) : null;
+  const res = resolveSession(flags, { project: project.folder, cwd: cwdOf(flags) });
+  const st = res.id ? loadState(res.id) : null;
   const lines = text.split('\n');
   let result;
 
@@ -328,12 +396,17 @@ function cmdAppendEntry(args, flags) {
   }
 
   if (st) {
-    st.saved[project.folder] = true;
-    st.entryHeading[project.folder] = result.heading;
-    saveState(st);
+    updateState(res.id, (s) => {
+      s.saved[project.folder] = true;
+      s.entryHeading[project.folder] = result.heading;
+    });
     result.stateUpdated = true;
+    result.session = res.id;
   } else {
     result.stateUpdated = false;
+    result.warning = res.ambiguous
+      ? `entry appended, but several sessions have unsaved changes for ${project.folder} (${res.ambiguous.join(', ')}); rerun with --session <id> or run mark-saved so the Stop hook stops asking.`
+      : `entry appended, but no session state was found to mark as saved${flags.session ? ` (${flags.session})` : ''}; if the Stop hook keeps asking, run mark-saved --session <id> --project ${project.folder}.`;
   }
   result.file = project.dynamicFile;
   return result;

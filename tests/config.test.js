@@ -53,3 +53,7 @@ test('memoryRootReachable reflects the filesystem', () => {
   assert.equal(memoryRootReachable({ memoryRoot: path.join(home, 'nope') }), false);
   assert.equal(memoryRootReachable(null), false);
 });
+
+test('default ignore covers the temp entry files the save skill writes (review)', () => {
+  assert.ok(DEFAULTS.ignore.includes('**/aimemory-entry*.md'));
+});

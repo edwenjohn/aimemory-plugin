@@ -12,7 +12,7 @@ node "${PLUGIN_ROOT}/scripts/aimemory.js" pause --session <session_id>
 node "${PLUGIN_ROOT}/scripts/aimemory.js" resume --session <session_id>
 ```
 
-- You need the current session id. It is the `session_id` the hooks receive; $aimemory-status shows the state file if you pass `--session`. If you cannot determine it, tell the user and offer the permanent setting instead:
+- The Session id is printed in the session-start context ("Session id: …") and in every Stop hook message. Without `--session`, the CLI uses the single session for the current folder and reports it; if several match, pass the id. If you cannot determine it at all, offer the permanent setting instead:
 
   ```
   node "${PLUGIN_ROOT}/scripts/aimemory.js" config set autoSave remind
